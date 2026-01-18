@@ -1,0 +1,180 @@
+name: "Swift: Sync Latest Release"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'  # Daily at 3am UTC
+
+jobs:
+
+  # ===========================================================================
+  # SYNC: Check for new upstream tags and prepare release
+  # ===========================================================================
+
+  sync:
+    name: Sync Upstream
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.upstream.outputs.version }}
+      upstream: ${{ steps.upstream.outputs.upstream }}
+      branch: ${{ steps.branch.outputs.branch }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: swift
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/libgit2/libgit2.git
+
+      - name: Fetch upstream tags
+        run: git fetch upstream --tags
+
+      - name: Get latest upstream version
+        id: upstream
+        run: |
+          UPSTREAM=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          VERSION="${UPSTREAM#v}"
+          echo "Latest upstream: $UPSTREAM (version $VERSION)"
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if already released
+        id: check
+        env:
+          VERSION: ${{ steps.upstream.outputs.version }}
+        run: |
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New release needed: $VERSION"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cleanup stale release branch
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          BRANCH: release/${{ steps.upstream.outputs.version }}
+        run: git push origin --delete "$BRANCH" || true
+
+      - name: Prepare release branch
+        id: branch
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          VERSION: ${{ steps.upstream.outputs.version }}
+          UPSTREAM: ${{ steps.upstream.outputs.upstream }}
+          BRANCH: release/${{ steps.upstream.outputs.version }}
+        run: |
+          # Create release branch from swift (our source of truth)
+          git checkout -b "$BRANCH" origin/swift
+
+          # Merge the upstream tag into our branch
+          git merge "$UPSTREAM" -m "Merge upstream $UPSTREAM" --no-edit
+
+          # Push release branch for testing
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+  # ===========================================================================
+  # CHECK: Ensure the package builds correctly
+  # ===========================================================================
+
+  check:
+    name: Check Build
+    needs: [sync]
+    if: needs.sync.outputs.should_release == 'true'
+    uses: ./.github/workflows/swift-check.yml
+    with:
+      ref: ${{ needs.sync.outputs.branch }}
+
+  # ===========================================================================
+  # RELEASE: Tag and update swift branch on success
+  # ===========================================================================
+
+  release:
+    name: Release
+    needs: [sync, check]
+    if: needs.check.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.sync.outputs.branch }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ needs.sync.outputs.version }}
+        run: |
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.sync.outputs.version }}
+          UPSTREAM: ${{ needs.sync.outputs.upstream }}
+        run: |
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes "Automated release of [libgit2 $UPSTREAM](https://github.com/libgit2/libgit2/releases/tag/$UPSTREAM) with Swift Package Manager support."
+
+      - name: Update swift branch
+        env:
+          BRANCH: ${{ needs.sync.outputs.branch }}
+        run: |
+          # Fast-forward swift to the tested release branch
+          # (release branch was created from swift, so this is always a fast-forward)
+          git checkout swift
+          git merge "$BRANCH" --ff-only
+          git push origin swift
+
+      - name: Cleanup release branch
+        env:
+          BRANCH: ${{ needs.sync.outputs.branch }}
+        run: git push origin --delete "$BRANCH"
+
+  # ===========================================================================
+  # FAILURE NOTIFICATION: Create issue if sync fails
+  # ===========================================================================
+
+  failure-notification:
+    name: Failure Notification
+    needs: [sync, check]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.sync.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --title "Sync failed for ${VERSION:-unknown}" \
+            --label "sync-failure" \
+            --body "The automated sync workflow failed.
+
+          **Version:** ${VERSION:-unknown}
+          **Run:** $RUN_URL
+
+          Please investigate and resolve manually."

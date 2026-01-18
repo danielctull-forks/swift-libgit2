@@ -1,0 +1,177 @@
+name: "Swift: Check"
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        description: "Reference to run checks with"
+        default: ${{ github.ref }}
+  push:
+    branches: [swift]
+  pull_request:
+    branches: [swift]
+
+jobs:
+
+  check-linux:
+    name: Linux (Swift ${{ matrix.swift_version }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        swift_version: ["6.2"]
+    container:
+      image: swift:${{ matrix.swift_version }}-jammy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Swift Version
+        run: swift --version
+
+      - name: Clang Version
+        run: clang --version
+
+      - name: Swift Build
+        run: swift build
+
+  check-linux-static-sdk:
+    name: Static Linux SDK (Swift ${{ matrix.swift_version }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        swift_version: ["6.2"]
+    container:
+      image: swift:${{ matrix.swift_version }}-jammy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Checkout swiftlang/github-workflows
+        uses: actions/checkout@v4
+        with:
+          repository: swiftlang/github-workflows
+          path: github-workflows
+
+      - name: Swift Version
+        run: swift --version
+
+      - name: Clang Version
+        run: clang --version
+
+      - name: Install Static Linux SDK
+        run: |
+          github-workflows/.github/workflows/scripts/install-and-build-with-sdk.sh \
+            --static \
+            --build-command=":" \
+            ${{ matrix.swift_version }}
+
+      - name: Swift Build
+        run: |
+          SDK_NAME=$(swift sdk list | grep static-linux | head -1)
+          swift build --swift-sdk "$SDK_NAME"
+
+  check-windows:
+    name: Windows (Swift ${{ matrix.swift_version }})
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        swift_version: ["6.2"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Checkout swiftlang/github-workflows
+        uses: actions/checkout@v4
+        with:
+          repository: swiftlang/github-workflows
+          path: github-workflows
+          
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          architecture: "x64"
+
+      - name: Install Visual Studio Build Tools
+        run: . github-workflows/.github/workflows/scripts/windows/install-vsb.ps1
+
+      - name: Install Swift
+        run: . github-workflows/.github/workflows/scripts/windows/swift/install-swift-${{ matrix.swift_version }}.ps1
+
+      - name: Swift Version
+        run: swift --version
+
+      - name: Clang Version
+        run: clang --version
+
+      - name: Swift Build
+        run: swift build
+
+  check-macos:
+    name: macOS (Swift ${{ matrix.swift_version }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        swift_version: ["6.2"]
+        include:
+          - swift_version: "6.2"
+            xcode_version: "26.2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Select Xcode ${{ matrix.xcode_version }}
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode_version }}.app" >> $GITHUB_ENV
+
+      - name: Swift Version
+        run: xcrun swift --version
+
+      - name: Clang Version
+        run: xcrun clang --version
+
+      - name: Swift Build
+        run: xcrun swift build
+
+  check-ios:
+    name: iOS (Swift ${{ matrix.swift_version }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        swift_version: ["6.2"]
+        include:
+          - swift_version: "6.2"
+            xcode_version: "26.2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Select Xcode ${{ matrix.xcode_version }}
+        run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode_version }}.app
+
+      - name: Swift Version
+        run: xcrun swift --version
+        
+      - name: Clang Version
+        run: xcrun clang --version
+
+      - name: Swift Build
+        run: swift build -Xswiftc -sdk -Xswiftc $(xcrun --sdk iphonesimulator --show-sdk-path) -Xswiftc -target -Xswiftc arm64-apple-ios18.0-simulator
