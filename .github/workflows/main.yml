@@ -22,6 +22,8 @@ jobs:
   # and their details.  Then we build either in a docker container (Linux)
   # or on the actual hosts (macOS, Windows).
   build:
+    # Only run on the upstream repository, not forks
+    if: github.repository == 'libgit2/libgit2'
     strategy:
       matrix:
         platform:
@@ -234,6 +236,8 @@ jobs:
         path: build/results_*.xml
 
   documentation:
+    # Only run on the upstream repository, not forks
+    if: github.repository == 'libgit2/libgit2'
     name: Validate documentation
     runs-on: ubuntu-latest
     steps:
@@ -247,7 +251,7 @@ jobs:
   test_results:
     name: Test results
     needs: [ build ]
-    if: always()
+    if: always() && github.repository == 'libgit2/libgit2'
     runs-on: ubuntu-latest
     steps:
     - name: Download test results

@@ -18,6 +18,8 @@ jobs:
   # know the sha.  Only do this on CI builds (when the event is a "push")
   # because PR builds from forks lack permission to write packages.
   containers:
+    # Only run on the upstream repository, not forks
+    if: github.repository == 'libgit2/libgit2'
     strategy:
       matrix:
         container:

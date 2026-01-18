@@ -20,6 +20,8 @@ permissions:
 
 jobs:
   documentation:
+    # Only run on the upstream repository, not forks
+    if: github.repository == 'libgit2/libgit2'
     name: "Generate documentation"
     runs-on: "ubuntu-latest"
     steps:
