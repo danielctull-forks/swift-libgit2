@@ -19,9 +19,16 @@ import PackageDescription
 // - Android: Full support with OpenSSL
 // - Windows: Full support with WinHTTP and CNG
 // - WASI: Limited support (requires building on Linux host)
+//
+// SSH support:
+// Default: Use ssh_exec on macOS, Linux, Android (spawns system ssh binary)
+// libssh2 trait: Uses bundled libssh2 for SSH on all platforms
 
 let apple: [Platform] = [.iOS, .macOS, .tvOS, .visionOS, .watchOS]
 
+var traits: Set<Trait> = [.default(enabledTraits: [])]
+var packageDependencies: [Package.Dependency] = []
+var targetDependencies: [Target.Dependency] = []
 var sourcePaths: [String] = []
 var excludedPaths: [String] = []
 var cSettings: [CSetting] = []
@@ -347,9 +354,39 @@ cSettings += [
 
 // MARK: - SSH Transport
 
+// Default: Use ssh_exec on macOS, Linux, Android (spawns system ssh binary)
+// libssh2 trait: Uses bundled libssh2 for SSH on all platforms
+
+traits.insert(
+  .trait(
+    name: "libssh2",
+    description: "Use libssh2 for SSH transport (enables SSH for iOS, tvOS, watchOS, visionOS, Windows)"
+  )
+)
+
+packageDependencies += [
+  .package(
+    url: "https://github.com/danielctull-forks/swift-libssh2.git",
+    from: "1.11.1"
+  ),
+]
+
+targetDependencies += [
+  .product(
+    name: "libssh2",
+    package: "swift-libssh2",
+    condition: .when(traits: ["libssh2"])
+  ),
+]
+
 cSettings += [
-  .define("GIT_SSH", to: "1", .when(platforms: [.android, .linux, .macOS])),
-  .define("GIT_SSH_EXEC", to: "1", .when(platforms: [.android, .linux, .macOS])),
+  // Use bundled libssh2 on all platforms
+  .define("GIT_SSH", to: "1", .when(traits: ["libssh2"])),
+  .define("GIT_SSH_LIBSSH2", to: "1", .when(traits: ["libssh2"])),
+
+  // Use ssh_exec on platforms that support process spawning
+  .define("GIT_SSH", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
+  .define("GIT_SSH_EXEC", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
 ]
 
 // MARK: - Process Spawning
@@ -431,9 +468,12 @@ let package = Package(
   products: [
     .library(name: "libgit2", targets: ["libgit2"])
   ],
+  traits: traits,
+  dependencies: packageDependencies,
   targets: [
     .target(
       name: "libgit2",
+      dependencies: targetDependencies,
       path: ".",
       exclude: excludedPaths,
       sources: sourcePaths,

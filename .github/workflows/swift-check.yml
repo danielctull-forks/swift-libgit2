@@ -18,12 +18,13 @@ on:
 jobs:
 
   check-linux:
-    name: Linux (Swift ${{ matrix.swift_version }})
+    name: Linux (Swift ${{ matrix.swift_version }} | ${{ matrix.traits }})
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         swift_version: ["6.2"]
+        traits: ["default", "libssh2"]
     container:
       image: swift:${{ matrix.swift_version }}-jammy
     steps:
@@ -39,15 +40,16 @@ jobs:
         run: clang --version
 
       - name: Swift Build
-        run: swift build
+        run: swift build --traits ${{ matrix.traits }}
 
   check-linux-static-sdk:
-    name: Static Linux SDK (Swift ${{ matrix.swift_version }})
+    name: Static Linux SDK (Swift ${{ matrix.swift_version }} | ${{ matrix.traits }})
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         swift_version: ["6.2"]
+        traits: ["default", "libssh2"]
     container:
       image: swift:${{ matrix.swift_version }}-jammy
     steps:
@@ -78,15 +80,16 @@ jobs:
       - name: Swift Build
         run: |
           SDK_NAME=$(swift sdk list | grep static-linux | head -1)
-          swift build --swift-sdk "$SDK_NAME"
+          swift build --traits ${{ matrix.traits }} --swift-sdk "$SDK_NAME"
 
   check-windows:
-    name: Windows (Swift ${{ matrix.swift_version }})
+    name: Windows (Swift ${{ matrix.swift_version }} | ${{ matrix.traits }})
     runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         swift_version: ["6.2"]
+        traits: ["default", "libssh2"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,10 +121,10 @@ jobs:
         run: clang --version
 
       - name: Swift Build
-        run: swift build
+        run: swift build --traits ${{ matrix.traits }}
 
   check-macos:
-    name: macOS (Swift ${{ matrix.swift_version }})
+    name: macOS (Swift ${{ matrix.swift_version }} | ${{ matrix.traits }})
     runs-on: macos-15
     strategy:
       fail-fast: false
@@ -130,6 +133,7 @@ jobs:
         include:
           - swift_version: "6.2"
             xcode_version: "26.2"
+        traits: ["default", "libssh2"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -146,15 +150,16 @@ jobs:
         run: xcrun clang --version
 
       - name: Swift Build
-        run: xcrun swift build
+        run: xcrun swift build --traits ${{ matrix.traits }}
 
   check-ios:
-    name: iOS (Swift ${{ matrix.swift_version }})
+    name: iOS (Swift ${{ matrix.swift_version }} | ${{ matrix.traits }})
     runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
         swift_version: ["6.2"]
+        traits: ["default", "libssh2"]
         include:
           - swift_version: "6.2"
             xcode_version: "26.2"
@@ -174,4 +179,4 @@ jobs:
         run: xcrun clang --version
 
       - name: Swift Build
-        run: swift build -Xswiftc -sdk -Xswiftc $(xcrun --sdk iphonesimulator --show-sdk-path) -Xswiftc -target -Xswiftc arm64-apple-ios18.0-simulator
+        run: swift build --traits ${{ matrix.traits }} -Xswiftc -sdk -Xswiftc $(xcrun --sdk iphonesimulator --show-sdk-path) -Xswiftc -target -Xswiftc arm64-apple-ios18.0-simulator
