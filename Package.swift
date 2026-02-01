@@ -58,6 +58,7 @@ cSettings += [
   excludedPaths += [
     "src/util/unix",
     "include/git2/stdint.h",
+    "include/git2/sys/stream.h",
   ]
 #else
   excludedPaths += ["src/util/win32"]

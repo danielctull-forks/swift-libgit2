@@ -3,4 +3,5 @@ module libgit2 {
   export *
 
   exclude header "git2/stdint.h"
+  exclude header "git2/sys/stream.h"
 }
