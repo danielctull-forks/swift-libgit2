@@ -55,7 +55,10 @@ cSettings += [
 // MARK: - Platform Utilities
 
 #if os(Windows)
-  excludedPaths += ["src/util/unix"]
+  excludedPaths += [
+    "src/util/unix",
+    "include/git2/stdint.h",
+  ]
 #else
   excludedPaths += ["src/util/win32"]
 #endif
