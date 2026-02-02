@@ -1,0 +1,4 @@
+module libgit2 {
+  umbrella "git2"
+  export *
+}
