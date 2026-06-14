@@ -1,3 +1,121 @@
+v1.9.4
+------
+
+This release includes a few small but important bugfixes.
+
+* cmake: separate generated headers from translated headers by
+  @ethomson in https://github.com/libgit2/libgit2/pull/7263
+* Avoid uninitialized variable warnings in gcc by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7258
+* fix: Recognize relative worktrees extension by @cwill747 in
+  https://github.com/libgit2/libgit2/pull/7254
+* fix(sha256): thread-safety bug in builtin SHA-256 by @weihanglo in
+  https://github.com/libgit2/libgit2/pull/7266
+
+v1.9.3
+------
+
+This release includes a number of bugfixes and compatibility
+improvements, particularly around SHA256 support.
+
+* cmake: fix linker error when using ninja build generator by
+  @kcsaul in https://github.com/libgit2/libgit2/pull/7249
+* Handle redirects with Content-Length: 0 correctly by
+  @ethomson in https://github.com/libgit2/libgit2/pull/7246
+* ci: use poxygit v0.8.1 in the tests by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7248
+* Zero indexer stats in pack objects by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7243
+* submodule: git_index_add_bypath does not move conflict entries
+  to REUC by @lrm29 in https://github.com/libgit2/libgit2/pull/7003
+* fix: prevent SSH timeout infinite loop and enable TCP keepalive
+  by @ambv in https://github.com/libgit2/libgit2/pull/7165
+* merge_files: avoid UB in xdiff by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7239
+* git_merge_file_from_index: handle cases when a child (ours or
+  theirs) is null by @eantoranz in
+  https://github.com/libgit2/libgit2/pull/7092
+* cmake: write git.h.tmp to current binary directory by @kcsaul in
+  https://github.com/libgit2/libgit2/pull/7241
+* fix(pack): ensure pack_backend__read returns null terminated buffer
+  by @kanru in https://github.com/libgit2/libgit2/pull/7238
+* Check object lengths against headers in read_loose by @howtonotwin
+  in https://github.com/libgit2/libgit2/pull/7178
+* cmake: don't recreate git2.h unnecessarily by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7234
+* Memory Backend Corruption Fix by @kcsaul in
+  https://github.com/libgit2/libgit2/pull/7232
+* Fixed a heap-buffer-overflow in the smart_pkt.c:set_data function
+  by @oliverchang in https://github.com/libgit2/libgit2/pull/7118
+* fix(transport): get oid_type on local transport by @weihanglo in
+  https://github.com/libgit2/libgit2/pull/7229
+* `GIT_REMOTE_DOWNLOAD_TAGS_ALL`: remove stray "the" in docs by
+  @DanielEScherzer in https://github.com/libgit2/libgit2/pull/7228
+* fix(clone): propagate object format in local clone by @weihanglo in
+  https://github.com/libgit2/libgit2/pull/7226
+* repo: Fix possible null pointer dereference by @csware in
+  https://github.com/libgit2/libgit2/pull/7225
+* revparse: Allow `HEAD` abbreviation `@` by @KoviRobi in
+  https://github.com/libgit2/libgit2/pull/7218
+* camke: include libssh2 in `Requires.private` in the PC file
+  by @carlosmn in https://github.com/libgit2/libgit2/pull/7215
+* futils: fix undefined behavior in O_FSYNC fallback definition
+  by @cehoffman in https://github.com/libgit2/libgit2/pull/7211
+* pcre: actually fix dangling-pointer warning by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7206
+* pcre: update cmake warnings for non-gcc by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7205
+* Fix some warnings with gcc by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7203
+* fix: apply insteadOf from global config for detached remotes by
+  @weihanglo in https://github.com/libgit2/libgit2/pull/7195
+* Fix `git_index_entry` documentation by @bakersdozen123 in
+  https://github.com/libgit2/libgit2/pull/7192
+* config: Fix potential null value passed to %s by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7190
+* index: support USE_NSEC=OFF by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7187
+* feat(remote): expose `git_remote_oid_type` by @weihanglo in
+  https://github.com/libgit2/libgit2/pull/7185
+* fix(smart): keep caps across RPC stream resets by @weihanglo in
+  https://github.com/libgit2/libgit2/pull/7183
+* fix wrong comment by @Murmele in
+  https://github.com/libgit2/libgit2/pull/7181
+* fix(sha256): pass correct oid type by @weihanglo in
+  https://github.com/libgit2/libgit2/pull/7179
+* examples: correct `git_commit_time` comment by @qaqland in
+  https://github.com/libgit2/libgit2/pull/7175
+* tests: update to latest clar by @ethomson in
+  https://github.com/libgit2/libgit2/pull/7173
+* delta: fix undefined behavior in hdr_sz varint parsing
+  by @Oblivionsage in https://github.com/libgit2/libgit2/pull/7172
+* ci: Update macos-13 to macos-14 images on GitHub Actions by @ambv
+  in https://github.com/libgit2/libgit2/pull/7167
+* ci: Fix cases of -Werror=discarded-qualifiers raised by @gcc 15.2
+  by @ambv in https://github.com/libgit2/libgit2/pull/7164
+* Use CMAKE_INSTALL_INCLUDEDIR for libgit2package INSTALL_INTERFACE
+  by @aware70 in https://github.com/libgit2/libgit2/pull/7155
+* Fix C4703 uninitialized pointer variable warnings by
+  @ShiningMassXAcc in https://github.com/libgit2/libgit2/pull/7154
+* test: check the correct filesystem for case-sensitivity by @ambv
+  in https://github.com/libgit2/libgit2/pull/7153
+* ci: update ci/docker/fedora to work with Rawhide 44 by @ambv
+  in https://github.com/libgit2/libgit2/pull/7152
+* refs: honor REFSPEC_SHORTHAND for multi-segment refs by @roberth
+  in https://github.com/libgit2/libgit2/pull/7148
+* config: Fix potential null value passed to %s by @orgads in
+  https://github.com/libgit2/libgit2/pull/7131
+* Fix potential access to uninitialized variables by @orgads
+  in https://github.com/libgit2/libgit2/pull/7130
+* refspec: Detect DEL character in is_valid_name by @xokdvium
+  in https://github.com/libgit2/libgit2/pull/7120
+* Update documentation to clarify that cert cb is always called
+  by @ehuss in https://github.com/libgit2/libgit2/pull/7119
+* Update `racy.c` reference by @emmanuel-ferdman in
+  https://github.com/libgit2/libgit2/pull/7091
+* Avoid duplicate definition of git_http_auth_dummy. by
+  @JohannesWilde in https://github.com/libgit2/libgit2/pull/7077
+
 v1.9.2
 ------
 
