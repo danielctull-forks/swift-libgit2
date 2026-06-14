@@ -8,6 +8,26 @@ on:
 jobs:
 
   # ===========================================================================
+  # MIRROR: Keep main in sync with upstream to prevent inactivity timeout
+  # ===========================================================================
+
+  mirror:
+    name: Mirror Upstream
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: swift
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      - name: Sync upstream branch
+        run: |
+          git remote add upstream https://github.com/libgit2/libgit2.git
+          git fetch upstream main
+          git push origin upstream/main:refs/heads/upstream --force
+
+  # ===========================================================================
   # SYNC: Check for new upstream tags and prepare release
   # ===========================================================================
 
