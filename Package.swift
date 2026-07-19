@@ -102,41 +102,43 @@ linkerSettings += [
   .linkedLibrary("z", .when(platforms: [.android, .linux])),
 ]
 
-// MARK: - PCRE
+// MARK: - PCRE2
 
-sourcePaths += ["deps/pcre"]
+sourcePaths += ["deps/pcre2"]
 
 excludedPaths += [
-  "deps/pcre/CMakeLists.txt",
-  "deps/pcre/COPYING",
-  "deps/pcre/LICENCE",
-  // Exclude cmake directory contents explicitly (directory exclusion with
-  // trailing slash doesn't work reliably on Windows)
-  "deps/pcre/cmake/COPYING-CMAKE-SCRIPTS",
-  "deps/pcre/cmake/FindEditline.cmake",
-  "deps/pcre/cmake/FindPackageHandleStandardArgs.cmake",
-  "deps/pcre/cmake/FindReadline.cmake",
-  "deps/pcre/config.h.in",
+  "deps/pcre2/CMakeLists.txt",
+  "deps/pcre2/LICENCE.md",
+  "deps/pcre2/config.h.in",
+  "deps/pcre2/pcre2_fuzzsupport.c",
 ]
 
 cSettings += [
-  .headerSearchPath("deps/pcre"),
+  .headerSearchPath("deps/pcre2"),
+
+  // From cmake/SelectRegex.cmake: Select bundled PCRE2 as the regex backend.
   .define("GIT_REGEX_BUILTIN", to: "1"),
-  // PCRE configuration
-  .define("SUPPORT_PCRE8", to: "1"),
-  .define("HAVE_STDINT_H", to: "1"),
-  .define("HAVE_INTTYPES_H", to: "1"),
-  .define("HAVE_MEMMOVE", to: "1"),
-  .define("HAVE_STRERROR", to: "1"),
+
+  // From cmake/SelectRegex.cmake: Statically compile PCRE2 into libgit2.
+  .define("PCRE2_STATIC", to: "1"),
+  .define("PCRE2_EXPORT", to: ""),
+  .define("PCRE2_EXP_DECL", to: ""),
+  .define("PCRE2_EXP_DEFN", to: ""),
+
+  // From deps/pcre2/CMakeLists.txt: Bundled PCRE2 configuration values.
+  .define("SUPPORT_PCRE2_8", to: "1"),
+  .define("SUPPORT_UNICODE", to: "1"),
+  .define("NEWLINE_DEFAULT", to: "2"),
   .define("LINK_SIZE", to: "2"),
+  .define("MAX_VARLOOKBEHIND", to: "255"),
   .define("PARENS_NEST_LIMIT", to: "250"),
+  .define("HEAP_LIMIT", to: "20000000"),
   .define("MATCH_LIMIT", to: "10000000"),
-  .define("MATCH_LIMIT_RECURSION", to: "10000000"),
-  .define("NEWLINE", to: "10"),
-  .define("NO_RECURSE", to: "1"),
-  .define("POSIX_MALLOC_THRESHOLD", to: "10"),
-  .define("BSR_ANYCRLF", to: "0"),
-  .define("MAX_NAME_SIZE", to: "32"),
+  .define("MATCH_LIMIT_DEPTH", to: "MATCH_LIMIT"),
+  .define("PCRE2_CODE_UNIT_WIDTH", to: "8"),
+
+  // From deps/pcre2/config.h.in: PCRE2 name-table limits.
+  .define("MAX_NAME_SIZE", to: "128"),
   .define("MAX_NAME_COUNT", to: "10000"),
 ]
 
