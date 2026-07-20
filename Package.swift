@@ -423,7 +423,7 @@ linkerSettings += [
 
 cSettings += [
   .define("GIT_QSORT_BSD", .when(platforms: apple)),
-  .define("GIT_QSORT_GNU", .when(platforms: [.android, .linux])),
+  .define("GIT_QSORT_GNU", .when(platforms: [.linux])),
   .define("GIT_QSORT_MSC", .when(platforms: [.windows])),
 ]
 
