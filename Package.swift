@@ -18,6 +18,7 @@ import PackageDescription
 // - Linux: Full support with OpenSSL
 // - Android: Full support with OpenSSL
 // - Windows: Full support with WinHTTP and CNG
+// - WASI: Local repository support without HTTP or SSH transports
 //
 // SSH support:
 // Default: Use ssh_exec on macOS, Linux, Android (spawns system ssh binary)
