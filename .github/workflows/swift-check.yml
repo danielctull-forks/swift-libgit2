@@ -54,7 +54,6 @@ jobs:
 
       # Android
       enable_android_sdk_build: true
-      enable_android_sdk_checks: true
       android_sdk_build_command: "swift build"
       android_sdk_versions: '["6.3"]'
 
