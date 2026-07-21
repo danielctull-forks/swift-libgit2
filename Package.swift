@@ -85,23 +85,6 @@ targets += [
   ),
 
   .target(
-    name: .name("util_unix"),
-    path: ".",
-    sources: [
-      "src/util/unix/map.c",
-      "src/util/unix/process.c",
-    ],
-    publicHeadersPath: "include"
-  ),
-
-  .target(
-    name: .name("util_realpath"),
-    path: ".",
-    sources: ["src/util/unix/realpath.c"],
-    publicHeadersPath: "include"
-  ),
-
-  .target(
     name: .name("util_win32"),
     path: ".",
     sources: ["src/util/win32"],
@@ -111,9 +94,64 @@ targets += [
 
 targetDependencies += [
   .target(name: .name("util")),
-  .target(name: .name("util_unix"), condition: .when(platforms: apple + [.android, .linux])),
-  .target(name: .name("util_realpath"), condition: .when(platforms: apple + [.android, .linux, .wasi])),
   .target(name: .name("util_win32"), condition: .when(platforms: [.windows])),
+]
+
+// MARK: - Memory Mapping
+
+targets += [
+
+  .target(
+    name: .name("util_unix_mmap"),
+    path: ".",
+    sources: ["src/util/unix/map.c"],
+    publicHeadersPath: "include"
+  ),
+]
+
+targetDependencies += [
+  .target(name: .name("util_unix_mmap"), condition: .when(platforms: apple + [.android, .linux])),
+]
+
+cSettings += [
+  // WASI has no mmap. Use libgit2's portable read-into-memory fallback.
+  .define("NO_MMAP", .when(platforms: [.wasi])),
+]
+
+// MARK: - Process Spawning
+
+targets += [
+
+  .target(
+    name: .name("util_unix_process"),
+    path: ".",
+    sources: ["src/util/unix/process.c"],
+    publicHeadersPath: "include"
+  ),
+]
+
+targetDependencies += [
+  .target(name: .name("util_unix_process"), condition: .when(platforms: apple + [.android, .linux])),
+]
+
+cSettings += [
+  .define("GIT_NO_PROCESS_SPAWN", .when(platforms: [.iOS, .tvOS, .visionOS, .wasi, .watchOS])),
+]
+
+// MARK: - Path Resolution
+
+targets += [
+
+  .target(
+    name: .name("util_unix_realpath"),
+    path: ".",
+    sources: ["src/util/unix/realpath.c"],
+    publicHeadersPath: "include"
+  ),
+]
+
+targetDependencies += [
+  .target(name: .name("util_unix_realpath"), condition: .when(platforms: apple + [.android, .linux, .wasi])),
 ]
 
 // MARK: - Threading
@@ -535,13 +573,6 @@ cSettings += [
   .define("CRYPT_OPENSSL", .when(platforms: [.android, .linux])),
   .define("CRYPT_OPENSSL_DYNAMIC", .when(platforms: [.android, .linux])),
   .define("OPENSSL_API_COMPAT", to: "0x10100000L", .when(platforms: [.android, .linux])),
-]
-
-// MARK: - Process Spawning
-
-cSettings += [
-  .define("GIT_NO_PROCESS_SPAWN", .when(platforms: [.iOS, .tvOS, .visionOS, .wasi, .watchOS])),
-  .define("NO_MMAP", .when(platforms: [.wasi])),
 ]
 
 // MARK: - Internationalization
