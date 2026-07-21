@@ -403,12 +403,37 @@ linkerSettings += [
   .linkedLibrary("secur32", .when(platforms: [.windows])),
 ]
 
-// MARK: - HTTP Transport
+// MARK: - Transports
+
+traits.insert(
+  .trait(
+    name: "libssh2",
+    description: "Use libssh2 for SSH transport (enables SSH for iOS, tvOS, watchOS, visionOS, Windows)"
+  )
+)
+
+packageDependencies += [
+  .package(
+    url: "https://github.com/danielctull-forks/swift-libssh2.git",
+    from: "1.11.1"
+  ),
+]
+
+excludedPaths += [
+  "src/libgit2/transports",
+]
 
 targets += [
 
   .target(
     name: .name("transports"),
+    dependencies: [
+      .product(
+        name: "libssh2",
+        package: "swift-libssh2",
+        condition: .when(traits: ["libssh2"])
+      ),
+    ],
     path: ".",
     exclude: [
       "src/libgit2/transports/http.c",
@@ -439,8 +464,15 @@ targetDependencies += [
   .target(name: .name("transports_winhttp"), condition: .when(platforms: [.windows])),
 ]
 
-excludedPaths += [
-  "src/libgit2/transports",
+cSettings += [
+
+  // Use bundled libssh2 on all platforms
+  .define("GIT_SSH", to: "1", .when(traits: ["libssh2"])),
+  .define("GIT_SSH_LIBSSH2", to: "1", .when(traits: ["libssh2"])),
+
+  // Use ssh_exec on platforms that support process spawning
+  .define("GIT_SSH", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
+  .define("GIT_SSH_EXEC", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
 ]
 
 // MARK: - NTLM Authentication
@@ -491,43 +523,6 @@ cSettings += [
   .define("CRYPT_OPENSSL", .when(platforms: [.android, .linux])),
   .define("CRYPT_OPENSSL_DYNAMIC", .when(platforms: [.android, .linux])),
   .define("OPENSSL_API_COMPAT", to: "0x10100000L", .when(platforms: [.android, .linux])),
-]
-
-// MARK: - SSH Transport
-
-// Default: Use ssh_exec on macOS, Linux, Android (spawns system ssh binary)
-// libssh2 trait: Uses bundled libssh2 for SSH on all platforms
-
-traits.insert(
-  .trait(
-    name: "libssh2",
-    description: "Use libssh2 for SSH transport (enables SSH for iOS, tvOS, watchOS, visionOS, Windows)"
-  )
-)
-
-packageDependencies += [
-  .package(
-    url: "https://github.com/danielctull-forks/swift-libssh2.git",
-    from: "1.11.1"
-  ),
-]
-
-targetDependencies += [
-  .product(
-    name: "libssh2",
-    package: "swift-libssh2",
-    condition: .when(traits: ["libssh2"])
-  ),
-]
-
-cSettings += [
-  // Use bundled libssh2 on all platforms
-  .define("GIT_SSH", to: "1", .when(traits: ["libssh2"])),
-  .define("GIT_SSH_LIBSSH2", to: "1", .when(traits: ["libssh2"])),
-
-  // Use ssh_exec on platforms that support process spawning
-  .define("GIT_SSH", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
-  .define("GIT_SSH_EXEC", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
 ]
 
 // MARK: - Process Spawning
