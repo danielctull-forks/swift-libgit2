@@ -5,20 +5,19 @@ import PackageDescription
 // MARK: - Platform Configuration
 //
 // libgit2 requires different source files for different platforms. Since SPM's
-// exclude/sources parameters cannot use .when(platforms:), we use #if os() for
-// source file management and .when(platforms:) for all C settings.
+// exclude/sources parameters cannot use .when(platforms:), platform-specific
+// sources are built in conditional targets and all C settings use
+// .when(platforms:).
 //
 // This means:
 // - Same-platform builds work correctly (most common case)
-// - Cross-compilation works when host and target have compatible sources
-// - Cross-compilation from macOS to WASI requires source modifications
+// - Cross-compilation selects sources and settings for the build destination
 //
 // Platform support:
 // - Apple (macOS, iOS, tvOS, watchOS, visionOS): Full support
 // - Linux: Full support with OpenSSL
 // - Android: Full support with OpenSSL
 // - Windows: Full support with WinHTTP and CNG
-// - WASI: Limited support (requires building on Linux host)
 //
 // SSH support:
 // Default: Use ssh_exec on macOS, Linux, Android (spawns system ssh binary)
@@ -26,7 +25,14 @@ import PackageDescription
 
 let apple: [Platform] = [.iOS, .macOS, .tvOS, .visionOS, .watchOS]
 
+extension String {
+  static func name(_ name: String) -> String {
+    "libgit2_" + name
+  }
+}
+
 var traits: Set<Trait> = [.default(enabledTraits: [])]
+var targets: [Target] = []
 var packageDependencies: [Package.Dependency] = []
 var targetDependencies: [Target.Dependency] = []
 var sourcePaths: [String] = []
@@ -38,7 +44,6 @@ var linkerSettings: [LinkerSetting] = []
 
 sourcePaths += [
   "src/libgit2",
-  "src/util",
 ]
 
 excludedPaths += [
@@ -47,29 +52,57 @@ excludedPaths += [
   "src/libgit2/experimental.h.in",
   "src/libgit2/git2.rc",
   "src/libgit2/config.cmake.in",
-  "src/util/CMakeLists.txt",
-  "src/util/git2_features.h.in",
 ]
 
 cSettings += [
   .headerSearchPath("src/libgit2"),
-  .headerSearchPath("src/util"),
   .headerSearchPath("include"),
   .define("LIBGIT2_NO_FEATURES_H"),
   .define("GIT_ARCH_64", to: "1"),
 ]
 
-// MARK: - Platform Utilities
+// MARK: - util
 
-#if os(Windows)
-  excludedPaths += [
-    "src/util/unix",
-    "include/git2/stdint.h",
-    "include/git2/sys/stream.h",
-  ]
-#else
-  excludedPaths += ["src/util/win32"]
-#endif
+cSettings += [
+  .headerSearchPath("src/util"),
+]
+
+targets += [
+
+  .target(
+    name: .name("util"),
+    path: ".",
+    exclude: [
+      "src/util/CMakeLists.txt",
+      "src/util/git2_features.h.in",
+      "src/util/hash",
+      "src/util/unix",
+      "src/util/win32",
+    ],
+    sources: ["src/util"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("util_unix"),
+    path: ".",
+    sources: ["src/util/unix"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("util_win32"),
+    path: ".",
+    sources: ["src/util/win32"],
+    publicHeadersPath: "include"
+  ),
+]
+
+targetDependencies += [
+  .target(name: .name("util")),
+  .target(name: .name("util_unix"), condition: .when(platforms: apple + [.android, .linux, .wasi])),
+  .target(name: .name("util_win32"), condition: .when(platforms: [.windows])),
+]
 
 // MARK: - Threading
 
@@ -85,11 +118,22 @@ linkerSettings += [
 
 // MARK: - Zlib
 
-sourcePaths += ["deps/zlib"]
+targets += [
 
-excludedPaths += [
-  "deps/zlib/CMakeLists.txt",
-  "deps/zlib/LICENSE",
+  .target(
+    name: .name("zlib"),
+    path: ".",
+    exclude: [
+      "deps/zlib/CMakeLists.txt",
+      "deps/zlib/LICENSE",
+    ],
+    sources: ["deps/zlib"],
+    publicHeadersPath: "include"
+  )
+]
+
+targetDependencies += [
+  .target(name: .name("zlib"))
 ]
 
 cSettings += [
@@ -104,16 +148,28 @@ linkerSettings += [
 
 // MARK: - PCRE2
 
-sourcePaths += ["deps/pcre2"]
+targets += [
 
-excludedPaths += [
-  "deps/pcre2/CMakeLists.txt",
-  "deps/pcre2/LICENCE.md",
-  "deps/pcre2/config.h.in",
-  "deps/pcre2/pcre2_fuzzsupport.c",
+  .target(
+    name: .name("pcre2"),
+    path: ".",
+    exclude: [
+      "deps/pcre2/CMakeLists.txt",
+      "deps/pcre2/LICENCE.md",
+      "deps/pcre2/config.h.in",
+      "deps/pcre2/pcre2_fuzzsupport.c",
+    ],
+    sources: ["deps/pcre2"],
+    publicHeadersPath: "include"
+  )
+]
+
+targetDependencies += [
+  .target(name: .name("pcre2"))
 ]
 
 cSettings += [
+
   .headerSearchPath("deps/pcre2"),
 
   // From cmake/SelectRegex.cmake: Select bundled PCRE2 as the regex backend.
@@ -144,10 +200,19 @@ cSettings += [
 
 // MARK: - xdiff
 
-sourcePaths += ["deps/xdiff"]
+targets += [
 
-excludedPaths += [
-  "deps/xdiff/CMakeLists.txt",
+  .target(
+    name: .name("xdiff"),
+    path: ".",
+    exclude: ["deps/xdiff/CMakeLists.txt"],
+    sources: ["deps/xdiff"],
+    publicHeadersPath: "include"
+  )
+]
+
+targetDependencies += [
+  .target(name: .name("xdiff"))
 ]
 
 cSettings += [
@@ -156,11 +221,22 @@ cSettings += [
 
 // MARK: - llhttp
 
-sourcePaths += ["deps/llhttp"]
+targets += [
 
-excludedPaths += [
-  "deps/llhttp/CMakeLists.txt",
-  "deps/llhttp/LICENSE-MIT",
+  .target(
+    name: .name("llhttp"),
+    path: ".",
+    exclude: [
+      "deps/llhttp/CMakeLists.txt",
+      "deps/llhttp/LICENSE-MIT",
+    ],
+    sources: ["deps/llhttp"],
+    publicHeadersPath: "include"
+  )
+]
+
+targetDependencies += [
+  .target(name: .name("llhttp"))
 ]
 
 cSettings += [
@@ -170,64 +246,65 @@ cSettings += [
 
 // MARK: - Hash Implementations
 
-cSettings += [
-  .headerSearchPath("src/util/hash/sha1dc"),
-  .headerSearchPath("src/util/hash/rfc6234"),
+targets += [
+
+  .target(
+    name: .name("hash_common_crypto"),
+    path: ".",
+    sources: [
+      "src/util/hash/common_crypto.h",
+      "src/util/hash/common_crypto.c",
+    ],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("hash_win32"),
+    path: ".",
+    sources: [
+      "src/util/hash/win32.h",
+      "src/util/hash/win32.c",
+    ],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("hash_rfc6234"),
+    path: ".",
+    sources: ["src/util/hash/rfc6234"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("hash_sha1dc"),
+    path: ".",
+    sources: ["src/util/hash/sha1dc"],
+    publicHeadersPath: "include"
+  ),
 ]
 
-// Exclude mbedTLS hash backend (not used on any platform)
-excludedPaths += [
-  "src/util/hash/mbedtls.c",
-  "src/util/hash/mbedtls.h",
+targetDependencies += [
+  .target(name: .name("hash_common_crypto"), condition: .when(platforms: apple)),
+  .target(name: .name("hash_win32"), condition: .when(platforms: [.windows])),
+  .target(name: .name("hash_rfc6234"), condition: .when(platforms: [.linux, .android, .wasi])),
+  .target(name: .name("hash_sha1dc"), condition: .when(platforms: [.linux, .android, .wasi])),
 ]
-
-// Exclude OpenSSL hash backend (we use CommonCrypto, CNG, or builtin)
-excludedPaths += [
-  "src/util/hash/openssl.c",
-  "src/util/hash/openssl.h",
-]
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-  // Apple: Use CommonCrypto for hashing
-  excludedPaths += [
-    "src/util/hash/win32.c",
-    "src/util/hash/win32.h",
-    "src/util/hash/builtin.c",
-    "src/util/hash/builtin.h",
-    "src/util/hash/collisiondetect.c",
-    "src/util/hash/collisiondetect.h",
-    "src/util/hash/rfc6234",
-    "src/util/hash/sha1dc",
-  ]
-#elseif os(Windows)
-  // Windows: Use CNG for hashing
-  excludedPaths += [
-    "src/util/hash/common_crypto.c",
-    "src/util/hash/common_crypto.h",
-    "src/util/hash/builtin.c",
-    "src/util/hash/builtin.h",
-    "src/util/hash/collisiondetect.c",
-    "src/util/hash/collisiondetect.h",
-    "src/util/hash/rfc6234",
-    "src/util/hash/sha1dc",
-  ]
-#else
-  // Linux/Android/WASI: Use builtin SHA1DC + RFC6234
-  excludedPaths += [
-    "src/util/hash/common_crypto.c",
-    "src/util/hash/common_crypto.h",
-    "src/util/hash/win32.c",
-    "src/util/hash/win32.h",
-  ]
-#endif
 
 cSettings += [
+  .headerSearchPath("src/util/hash/sha1dc", .when(platforms: [.linux, .android, .wasi])),
+  .headerSearchPath("src/util/hash/rfc6234", .when(platforms: [.linux, .android, .wasi])),
+]
+
+cSettings += [
+
   // Apple: CommonCrypto
   .define("GIT_SHA1_COMMON_CRYPTO", to: "1", .when(platforms: apple)),
   .define("GIT_SHA256_COMMON_CRYPTO", to: "1", .when(platforms: apple)),
+
   // Windows: CNG
   .define("GIT_SHA1_WIN32", to: "1", .when(platforms: [.windows])),
   .define("GIT_SHA256_WIN32", to: "1", .when(platforms: [.windows])),
+
   // Linux/Android/WASI: Builtin collision-detecting SHA1 + RFC6234 SHA256
   .define("GIT_SHA1_COLLISIONDETECT", to: "1", .when(platforms: [.android, .linux, .wasi])),
   .define("GIT_SHA256_BUILTIN", to: "1", .when(platforms: [.android, .linux, .wasi])),
@@ -244,120 +321,89 @@ cSettings += [
 // and git_mbedtls_stream_global_init in its initialization. We include these files
 // on all platforms to get the stubs.
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-  // Apple: Use SecureTransport (but keep openssl.c/mbedtls.c for stubs)
-  excludedPaths += [
-    "src/libgit2/streams/openssl_dynamic.c",
-    "src/libgit2/streams/openssl_dynamic.h",
-    "src/libgit2/streams/openssl_legacy.c",
-    "src/libgit2/streams/openssl_legacy.h",
-    "src/libgit2/streams/schannel.c",
-    "src/libgit2/streams/schannel.h",
-  ]
-#elseif os(Windows)
-  // Windows: Use Schannel (via WinHTTP) (but keep openssl.c/mbedtls.c for stubs)
-  excludedPaths += [
-    "src/libgit2/streams/stransport.c",
-    "src/libgit2/streams/stransport.h",
-    "src/libgit2/streams/openssl_dynamic.c",
-    "src/libgit2/streams/openssl_dynamic.h",
-    "src/libgit2/streams/openssl_legacy.c",
-    "src/libgit2/streams/openssl_legacy.h",
-  ]
-#else
-  // Linux/Android: Use OpenSSL (dynamic linking) (but keep mbedtls.c for stub)
-  excludedPaths += [
-    "src/libgit2/streams/stransport.c",
-    "src/libgit2/streams/stransport.h",
-    "src/libgit2/streams/schannel.c",
-    "src/libgit2/streams/schannel.h",
-  ]
-#endif
+targets += [
+
+  .target(
+    name: .name("streams"),
+    path: ".",
+    sources: [
+      "src/libgit2/streams/mbedtls.c",
+      "src/libgit2/streams/openssl.c",
+      "src/libgit2/streams/registry.c",
+      "src/libgit2/streams/socket.c",
+      "src/libgit2/streams/tls.c",
+    ],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("streams_secure_transport"),
+    path: ".",
+    sources: ["src/libgit2/streams/stransport.c"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("streams_schannel"),
+    path: ".",
+    sources: ["src/libgit2/streams/schannel.c"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("streams_openssl"),
+    path: ".",
+    sources: [
+      "src/libgit2/streams/openssl_dynamic.c",
+      "src/libgit2/streams/openssl_legacy.c",
+    ],
+    publicHeadersPath: "include"
+  ),
+]
+
+targetDependencies += [
+  .target(name: .name("streams")),
+  .target(name: .name("streams_secure_transport"), condition: .when(platforms: apple)),
+  .target(name: .name("streams_schannel"), condition: .when(platforms: [.windows])),
+  .target(name: .name("streams_openssl"), condition: .when(platforms: [.android, .linux, .wasi])),
+]
+
+excludedPaths += [
+  "src/libgit2/streams",
+]
 
 cSettings += [
+
   .define("GIT_HTTPS", to: "1", .when(platforms: apple + [.android, .linux, .windows])),
+
   // Apple: SecureTransport for TLS
   .define("GIT_SECURE_TRANSPORT", to: "1", .when(platforms: apple)),
+
   // Linux/Android: OpenSSL (dynamically loaded) for TLS
   .define("GIT_OPENSSL", to: "1", .when(platforms: [.android, .linux])),
   .define("GIT_OPENSSL_DYNAMIC", to: "1", .when(platforms: [.android, .linux])),
+
   // Windows: WinHTTP for HTTP transport, Schannel for TLS
   .define("GIT_WINHTTP", to: "1", .when(platforms: [.windows])),
   .define("GIT_SCHANNEL", to: "1", .when(platforms: [.windows])),
 ]
 
 linkerSettings += [
+
   // Apple: Security and CoreFoundation frameworks for SecureTransport TLS
   .linkedFramework("Security", .when(platforms: apple)),
   .linkedFramework("CoreFoundation", .when(platforms: apple)),
+
   // Linux/Android: dlopen for OpenSSL
   .linkedLibrary("dl", .when(platforms: [.android, .linux])),
+
   // Windows: WinHTTP and crypto libraries
   .linkedLibrary("winhttp", .when(platforms: [.windows])),
   .linkedLibrary("crypt32", .when(platforms: [.windows])),
   .linkedLibrary("secur32", .when(platforms: [.windows])),
 ]
 
-// MARK: - HTTP Transport
-
-#if os(Windows)
-  // Windows uses WinHTTP for HTTP transport
-  excludedPaths += ["src/libgit2/transports/http.c"]
-#else
-  // All other platforms use standard HTTP transport
-  excludedPaths += ["src/libgit2/transports/winhttp.c"]
-#endif
-
-// MARK: - NTLM Authentication
-
-excludedPaths += [
-  "deps/ntlmclient/CMakeLists.txt",
-  // mbedTLS crypto backend (not used)
-  "deps/ntlmclient/crypt_mbedtls.c",
-  "deps/ntlmclient/crypt_mbedtls.h",
-  "deps/ntlmclient/crypt_builtin_md4.c",
-  // iconv unicode backend (we use builtin)
-  "deps/ntlmclient/unicode_iconv.c",
-  "deps/ntlmclient/unicode_iconv.h",
-]
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-  // Apple: Include ntlmclient with CommonCrypto
-  sourcePaths += ["deps/ntlmclient"]
-  excludedPaths += [
-    "deps/ntlmclient/crypt_openssl.c",
-    "deps/ntlmclient/crypt_openssl.h",
-  ]
-#elseif os(Windows)
-  // Windows: WinHTTP handles NTLM natively, no ntlmclient needed
-  excludedPaths += ["deps/ntlmclient"]
-#else
-  // Linux/Android: Include ntlmclient with OpenSSL
-  sourcePaths += ["deps/ntlmclient"]
-  excludedPaths += [
-    "deps/ntlmclient/crypt_commoncrypto.c",
-    "deps/ntlmclient/crypt_commoncrypto.h",
-  ]
-#endif
-
-cSettings += [
-  .headerSearchPath("deps/ntlmclient"),
-  // Enable NTLM on platforms that use ntlmclient
-  .define("GIT_AUTH_NTLM", to: "1", .when(platforms: apple + [.android, .linux])),
-  .define("GIT_AUTH_NTLM_BUILTIN", to: "1", .when(platforms: apple + [.android, .linux])),
-  .define("NTLM_STATIC", to: "1", .when(platforms: apple + [.android, .linux])),
-  .define("UNICODE_BUILTIN", to: "1", .when(platforms: apple + [.android, .linux])),
-  // Crypto backend selection
-  .define("CRYPT_COMMONCRYPTO", .when(platforms: apple)),
-  .define("CRYPT_OPENSSL", .when(platforms: [.android, .linux])),
-  .define("CRYPT_OPENSSL_DYNAMIC", .when(platforms: [.android, .linux])),
-  .define("OPENSSL_API_COMPAT", to: "0x10100000L", .when(platforms: [.android, .linux])),
-]
-
-// MARK: - SSH Transport
-
-// Default: Use ssh_exec on macOS, Linux, Android (spawns system ssh binary)
-// libssh2 trait: Uses bundled libssh2 for SSH on all platforms
+// MARK: - Transports
 
 traits.insert(
   .trait(
@@ -373,15 +419,53 @@ packageDependencies += [
   ),
 ]
 
-targetDependencies += [
-  .product(
-    name: "libssh2",
-    package: "swift-libssh2",
-    condition: .when(traits: ["libssh2"])
+excludedPaths += [
+  "src/libgit2/transports",
+]
+
+targets += [
+
+  .target(
+    name: .name("transports"),
+    dependencies: [
+      .product(
+        name: "libssh2",
+        package: "swift-libssh2",
+        condition: .when(traits: ["libssh2"])
+      ),
+    ],
+    path: ".",
+    exclude: [
+      "src/libgit2/transports/http.c",
+      "src/libgit2/transports/winhttp.c",
+    ],
+    sources: ["src/libgit2/transports"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("transports_http"),
+    path: ".",
+    sources: ["src/libgit2/transports/http.c"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("transports_winhttp"),
+    path: ".",
+    sources: ["src/libgit2/transports/winhttp.c"],
+    publicHeadersPath: "include"
   ),
 ]
 
+targetDependencies += [
+  .target(name: .name("transports")),
+  .target(name: .name("transports_http"), condition: .when(platforms: apple + [.android, .linux, .wasi])),
+  .target(name: .name("transports_winhttp"), condition: .when(platforms: [.windows])),
+]
+
 cSettings += [
+
   // Use bundled libssh2 on all platforms
   .define("GIT_SSH", to: "1", .when(traits: ["libssh2"])),
   .define("GIT_SSH_LIBSSH2", to: "1", .when(traits: ["libssh2"])),
@@ -389,6 +473,56 @@ cSettings += [
   // Use ssh_exec on platforms that support process spawning
   .define("GIT_SSH", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
   .define("GIT_SSH_EXEC", to: "1", .when(platforms: [.android, .linux, .macOS], traits: [])),
+]
+
+// MARK: - NTLM Authentication
+
+targets += [
+
+  .target(
+    name: .name("ntlm"),
+    path: ".",
+    sources: [
+      "deps/ntlmclient/ntlm.c",
+      "deps/ntlmclient/unicode_builtin.c",
+      "deps/ntlmclient/util.c",
+    ],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("ntlm_common_crypto"),
+    path: ".",
+    sources: ["deps/ntlmclient/crypt_commoncrypto.c"],
+    publicHeadersPath: "include"
+  ),
+
+  .target(
+    name: .name("ntlm_openssl"),
+    path: ".",
+    sources: ["deps/ntlmclient/crypt_openssl.c"],
+    publicHeadersPath: "include"
+  ),
+]
+
+targetDependencies += [
+  .target(name: .name("ntlm"), condition: .when(platforms: apple + [.android, .linux])),
+  .target(name: .name("ntlm_common_crypto"), condition: .when(platforms: apple)),
+  .target(name: .name("ntlm_openssl"), condition: .when(platforms: [.android, .linux])),
+]
+
+cSettings += [
+  .headerSearchPath("deps/ntlmclient"),
+  // Enable NTLM on platforms that use ntlmclient
+  .define("GIT_AUTH_NTLM", to: "1", .when(platforms: apple + [.android, .linux])),
+  .define("GIT_AUTH_NTLM_BUILTIN", to: "1", .when(platforms: apple + [.android, .linux])),
+  .define("NTLM_STATIC", to: "1", .when(platforms: apple + [.android, .linux])),
+  .define("UNICODE_BUILTIN", to: "1", .when(platforms: apple + [.android, .linux])),
+  // Crypto backend selection
+  .define("CRYPT_COMMONCRYPTO", .when(platforms: apple)),
+  .define("CRYPT_OPENSSL", .when(platforms: [.android, .linux])),
+  .define("CRYPT_OPENSSL_DYNAMIC", .when(platforms: [.android, .linux])),
+  .define("OPENSSL_API_COMPAT", to: "0x10100000L", .when(platforms: [.android, .linux])),
 ]
 
 // MARK: - Process Spawning
@@ -465,6 +599,24 @@ linkerSettings += [
 
 // MARK: - Package Definition
 
+let targetsWithSettings: [Target] = targets.map { target in
+  .target(
+    name: target.name, // Prefix name to avoid collisions.
+    dependencies: target.dependencies,
+    path: target.path,
+    exclude: target.exclude,
+    sources: target.sources,
+    resources: target.resources,
+    publicHeadersPath: target.publicHeadersPath,
+    packageAccess: target.packageAccess,
+    cSettings: cSettings + (target.cSettings ?? []), // Add shared settings
+    cxxSettings: target.cxxSettings,
+    swiftSettings: target.swiftSettings,
+    linkerSettings: target.linkerSettings,
+    plugins: target.plugins,
+  )
+}
+
 let package = Package(
   name: "swift-libgit2",
   products: [
@@ -472,7 +624,7 @@ let package = Package(
   ],
   traits: traits,
   dependencies: packageDependencies,
-  targets: [
+  targets: targetsWithSettings + [
     .target(
       name: "libgit2",
       dependencies: targetDependencies,
