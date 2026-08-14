@@ -83,8 +83,12 @@ jobs:
       - name: Cleanup stale release branch
         if: steps.check.outputs.should_release == 'true'
         env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
           BRANCH: release/${{ steps.upstream.outputs.version }}
-        run: git push origin --delete "$BRANCH" || true
+        run: |
+          if ! gh pr list --base swift --head "$BRANCH" --state open --json number --jq 'length > 0' | grep -qx true; then
+            git push origin --delete "$BRANCH" || true
+          fi
 
       - name: Prepare release branch
         id: branch
@@ -94,7 +98,14 @@ jobs:
           UPSTREAM: ${{ steps.upstream.outputs.upstream }}
           BRANCH: release/${{ steps.upstream.outputs.version }}
         run: |
-          # Create release branch from swift (our source of truth)
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            # Resume an existing release PR without changing its tested commit.
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Create release branch from swift (our source of truth).
           git checkout -b "$BRANCH" origin/swift
 
           # Merge the upstream tag into our branch
@@ -105,72 +116,38 @@ jobs:
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
   # ===========================================================================
-  # CHECK: Ensure the package builds correctly
+  # PULL REQUEST: Create release
   # ===========================================================================
 
-  check:
-    name: Check Build
+  pull-request:
+    name: Create Release Pull Request
     needs: [sync]
     if: needs.sync.outputs.should_release == 'true'
-    uses: ./.github/workflows/swift-check.yml
-    with:
-      ref: ${{ needs.sync.outputs.branch }}
-
-  # ===========================================================================
-  # RELEASE: Tag and update swift branch on success
-  # ===========================================================================
-
-  release:
-    name: Release
-    needs: [sync, check]
-    if: needs.check.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.sync.outputs.branch }}
-          fetch-depth: 0
-          token: ${{ secrets.SYNC_TOKEN }}
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create and push tag
-        env:
-          VERSION: ${{ needs.sync.outputs.version }}
-        run: |
-          git tag "$VERSION"
-          git push origin "$VERSION"
-
-      - name: Create GitHub release
+      - name: Create pull request
+        id: pull-request
         env:
           GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          BRANCH: ${{ needs.sync.outputs.branch }}
           VERSION: ${{ needs.sync.outputs.version }}
           UPSTREAM: ${{ needs.sync.outputs.upstream }}
         run: |
-          gh release create "$VERSION" \
-            --title "$VERSION" \
-            --notes "Automated release of [libgit2 $UPSTREAM](https://github.com/libgit2/libgit2/releases/tag/$UPSTREAM) with Swift Package Manager support."
+          NUMBER=$(gh pr list --base swift --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ "$NUMBER" = "null" ]; then
+            gh pr create --base swift --head "$BRANCH" --title "Release $VERSION" --body "Automated release of [libgit2 $UPSTREAM](https://github.com/libgit2/libgit2/releases/tag/$UPSTREAM) with Swift Package Manager support."
+            NUMBER=$(gh pr list --base swift --head "$BRANCH" --state open --json number --jq '.[0].number')
+          fi
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Update swift branch
+      - name: Enable auto-merge
         env:
-          BRANCH: ${{ needs.sync.outputs.branch }}
-        run: |
-          # Fast-forward swift to the tested release branch
-          # (release branch was created from swift, so this is always a fast-forward)
-          git checkout swift
-          git merge "$BRANCH" --ff-only
-          git push origin swift
-
-      - name: Cleanup release branch
-        env:
-          BRANCH: ${{ needs.sync.outputs.branch }}
-        run: git push origin --delete "$BRANCH"
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          NUMBER: ${{ steps.pull-request.outputs.number }}
+        run: gh pr merge "$NUMBER" --auto --merge
 
   # ===========================================================================
   # FAILURE NOTIFICATION: Create issue if sync fails
@@ -178,7 +155,7 @@ jobs:
 
   failure-notification:
     name: Failure Notification
-    needs: [sync, check]
+    needs: [sync, pull-request]
     if: failure()
     runs-on: ubuntu-latest
     permissions:
