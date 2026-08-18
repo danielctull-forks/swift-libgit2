@@ -147,6 +147,7 @@ jobs:
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           NUMBER: ${{ steps.pull-request.outputs.number }}
         run: gh pr merge "$NUMBER" --auto --merge
 
