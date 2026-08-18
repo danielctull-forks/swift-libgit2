@@ -45,7 +45,7 @@ jobs:
       linux_static_sdk_versions: '["6.2", "6.3"]'
 
       # Wasm
-      enable_wasm_sdk_build: false
+      enable_wasm_sdk_build: true
       wasm_sdk_build_command: "swift build"
       wasm_sdk_versions: '["6.3"]'
 
