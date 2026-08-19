@@ -138,7 +138,7 @@ jobs:
           UPSTREAM: ${{ needs.sync.outputs.upstream }}
         run: |
           NUMBER=$(gh pr list --base swift --head "$BRANCH" --state open --json number --jq '.[0].number')
-          if [ "$NUMBER" = "null" ]; then
+          if [ -z "$NUMBER" ] || [ "$NUMBER" = "null" ]; then
             gh pr create --base swift --head "$BRANCH" --title "Release $VERSION" --body "Automated release of [libgit2 $UPSTREAM](https://github.com/libgit2/libgit2/releases/tag/$UPSTREAM) with Swift Package Manager support."
             NUMBER=$(gh pr list --base swift --head "$BRANCH" --state open --json number --jq '.[0].number')
           fi
