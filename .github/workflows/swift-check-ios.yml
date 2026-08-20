@@ -40,8 +40,7 @@ jobs:
       - name: Run Tests on iOS Simulator
         run: |
           xcodebuild build \
-            -scheme Git \
+            -scheme swift-libgit2 \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -skipPackagePluginValidation \
-            -skipMacroValidation \
-            | xcpretty || exit 1
+            -skipMacroValidation
