@@ -10,8 +10,6 @@ on:
         type: string
         description: "Reference to run checks with"
         default: ${{ github.ref }}
-  push:
-    branches: [swift]
   pull_request:
     branches: [swift]
 
