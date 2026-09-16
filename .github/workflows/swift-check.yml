@@ -17,7 +17,7 @@ jobs:
 
   build:
     name: Build (${{ matrix.traits }})
-    uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.13
+    uses: swiftlang/github-workflows/.github/workflows/swift_package_test.yml@0.0.15
     strategy:
       matrix:
         traits: ["default", "libssh2"]
