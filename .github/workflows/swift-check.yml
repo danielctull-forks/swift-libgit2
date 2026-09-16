@@ -35,17 +35,17 @@ jobs:
       # Linux
       enable_linux_checks: true
       linux_build_command: "swift build"
-      linux_swift_versions: '["6.2", "6.3"]'
+      linux_swift_versions: '["6.2", "6.3", "6.4"]'
 
       # Static Linux
       enable_linux_static_sdk_build: true
       linux_static_sdk_build_command: "swift build"
-      linux_static_sdk_versions: '["6.2", "6.3"]'
+      linux_static_sdk_versions: '["6.2", "6.3", "6.4"]'
 
       # Wasm
       enable_wasm_sdk_build: false
       wasm_sdk_build_command: "swift build"
-      wasm_sdk_versions: '["6.3"]'
+      wasm_sdk_versions: '["6.3", "6.4"]'
 
       # Embedded Wasm
       enable_embedded_wasm_sdk_build: false
@@ -53,18 +53,18 @@ jobs:
       # Android
       enable_android_sdk_build: true
       android_sdk_build_command: "swift build"
-      android_sdk_versions: '["6.3"]'
+      android_sdk_versions: '["6.3", "6.4"]'
 
       # Windows
       enable_windows_checks: true
       enable_windows_docker: true
       windows_build_command: "Invoke-Program swift build"
-      windows_swift_versions: '["6.2", "6.3"]'
+      windows_swift_versions: '["6.2", "6.3", "6.4"]'
 
       # FreeBSD
-      enable_freebsd_checks: false
+      enable_freebsd_checks: true
       freebsd_build_command: "swift build"
-      freebsd_swift_versions: '[]'
+      freebsd_swift_versions: '["6.4"]'
 
   macos-build:
     name: Build (${{ matrix.traits }})
@@ -73,11 +73,11 @@ jobs:
       matrix:
         traits: ["default", "libssh2"]
     with:
-      swift_versions: '["6.2", "6.3"]'
+      swift_versions: '["6.2", "6.3", "6.4"]'
       swift_flags: --traits ${{ matrix.traits }}
 
   ios-build:
     name: Build (default)
     uses: ./.github/workflows/swift-check-ios.yml
     with:
-      swift_versions: '["6.2", "6.3"]'
+      swift_versions: '["6.2", "6.3", "6.4"]'
