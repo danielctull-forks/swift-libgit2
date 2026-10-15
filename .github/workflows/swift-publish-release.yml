@@ -23,20 +23,43 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.SYNC_TOKEN }}
 
-      - name: Publish release
+      - name: Derive release metadata
         env:
-          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
           VERSION="${BRANCH#release/}"
           UPSTREAM="v$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "UPSTREAM=$UPSTREAM" >> "$GITHUB_ENV"
 
+      - name: Validate release branch
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
           if [ "$VERSION" = "$BRANCH" ] || ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.]+)?$'; then
             echo "Release branch must use release/<version>: $BRANCH" >&2
             exit 1
           fi
 
+      - name: Determine prerelease status
+        id: prerelease-argument
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          PRERELEASE=$(gh release view "$UPSTREAM" --repo libgit2/libgit2 --json isPrerelease --jq .isPrerelease)
+          if [ "$PRERELEASE" = true ]; then
+            echo "prerelease-argument=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease-argument=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PRERELEASE_ARGUMENT: ${{ steps.prerelease-argument.outputs.prerelease-argument }}
+        run: |
           if git rev-parse "$VERSION" >/dev/null 2>&1; then
             test "$(git rev-parse "$VERSION^{commit}")" = "$MERGE_SHA"
           else
@@ -47,7 +70,8 @@ jobs:
           if ! gh release view "$VERSION" >/dev/null 2>&1; then
             gh release create "$VERSION" \
               --title "$VERSION" \
-              --notes "Automated release of [libgit2 $UPSTREAM](https://github.com/libgit2/libgit2/releases/tag/$UPSTREAM) with Swift Package Manager support."
+              --notes "Automated release of [libgit2 $UPSTREAM](https://github.com/libgit2/libgit2/releases/tag/$UPSTREAM) with Swift Package Manager support." \
+              $PRERELEASE_ARGUMENT
           fi
 
       - name: Delete release branch
