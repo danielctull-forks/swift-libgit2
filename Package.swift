@@ -219,6 +219,30 @@ cSettings += [
   .headerSearchPath("deps/xdiff"),
 ]
 
+// MARK: - reftable
+
+targets += [
+
+  .target(
+    name: .name("reftable"),
+    path: ".",
+    exclude: [
+      "deps/reftable/CMakeLists.txt",
+      "deps/reftable/LICENSE",
+    ],
+    sources: ["deps/reftable"],
+    publicHeadersPath: "include"
+  )
+]
+
+targetDependencies += [
+  .target(name: .name("reftable"))
+]
+
+cSettings += [
+  .headerSearchPath("deps/reftable"),
+]
+
 // MARK: - llhttp
 
 targets += [
@@ -281,6 +305,13 @@ targets += [
     sources: ["src/util/hash/sha1dc"],
     publicHeadersPath: "include"
   ),
+
+  .target(
+    name: .name("hash_builtin"),
+    path: ".",
+    sources: ["src/util/hash/builtin.c"],
+    publicHeadersPath: "include"
+  ),
 ]
 
 targetDependencies += [
@@ -288,6 +319,7 @@ targetDependencies += [
   .target(name: .name("hash_win32"), condition: .when(platforms: [.windows])),
   .target(name: .name("hash_rfc6234"), condition: .when(platforms: [.linux, .android, .wasi])),
   .target(name: .name("hash_sha1dc"), condition: .when(platforms: [.linux, .android, .wasi])),
+  .target(name: .name("hash_builtin"), condition: .when(platforms: [.linux, .android, .wasi])),
 ]
 
 cSettings += [
@@ -305,8 +337,8 @@ cSettings += [
   .define("GIT_SHA1_WIN32", to: "1", .when(platforms: [.windows])),
   .define("GIT_SHA256_WIN32", to: "1", .when(platforms: [.windows])),
 
-  // Linux/Android/WASI: Builtin collision-detecting SHA1 + RFC6234 SHA256
-  .define("GIT_SHA1_COLLISIONDETECT", to: "1", .when(platforms: [.android, .linux, .wasi])),
+  // Linux/Android/WASI: Builtin collision-detecting SHA1 + SHA256
+  .define("GIT_SHA1_BUILTIN", to: "1", .when(platforms: [.android, .linux, .wasi])),
   .define("GIT_SHA256_BUILTIN", to: "1", .when(platforms: [.android, .linux, .wasi])),
   .define("SHA1DC_NO_STANDARD_INCLUDES", to: "1", .when(platforms: [.android, .linux, .wasi])),
   .define("SHA1DC_CUSTOM_INCLUDE_SHA1_C", to: "\"git2_util.h\"", .when(platforms: [.android, .linux, .wasi])),
