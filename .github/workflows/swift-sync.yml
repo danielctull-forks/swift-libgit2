@@ -108,8 +108,12 @@ jobs:
           # Create release branch from swift (our source of truth).
           git checkout -b "$BRANCH" origin/swift
 
-          # Merge the upstream tag into our branch
-          git merge "$UPSTREAM" -m "Merge upstream $UPSTREAM" --no-edit
+          if git merge-base --is-ancestor "$UPSTREAM" HEAD; then
+            # Create a release commit so GitHub can open the release PR.
+            git commit --allow-empty -m "Prepare release $VERSION"
+          else
+            git merge "$UPSTREAM" -m "Merge upstream $UPSTREAM" --no-edit
+          fi
 
           # Push release branch for testing
           git push origin "$BRANCH"
